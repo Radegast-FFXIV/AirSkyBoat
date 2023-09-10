@@ -240,7 +240,6 @@ namespace gambits
                 // clang-format on
                 return count > 1;
             }
-            // Special cases with Light Spirit.
             else if (predicate.target == G_TARGET::ALLIANCE)
             {
                 auto result = false;
