@@ -293,7 +293,6 @@ bool CSpiritController::TryIdleSpellcast(time_point tick)
                 lastChoice = 2;
             }
         // clang-format on
-
         switch (lastChoice)
         {
             case 1:
@@ -306,12 +305,22 @@ bool CSpiritController::TryIdleSpellcast(time_point tick)
 
                     // If more than one party member is at low health or we rolled a Curaga.
                     if (numUnderThreshold > 1 || useCuraga)
+                    {
                         chosenSpell = DetermineHighestSpellFromMP(PSpirit->m_healAOESpells);
 
-                    // If there's only one person or the light spirit rolled a Curaga,
-                    // but doesn't even have MP for Curaga I.
-                    if (!useCuraga || (useCuraga && PSpirit->health.mp < spell::GetSpell(SpellID::Curaga)->getMPCost()))
+                        // If there's only one person or the light spirit rolled a Curaga,
+                        // but doesn't even have MP for Curaga I.
+                        if (PSpirit->health.mp < spell::GetSpell(SpellID::Curaga)->getMPCost())
+                        {
+                            chosenSpell = DetermineHighestSpellFromMP(PSpirit->m_healSingleSpells);
+                        }
+                        ShowDebug("[TryIdleSpellCast] AOE - chosenSpell (%s)", spell::GetSpell(static_cast<SpellID>(chosenSpell))->getName());
+                    }
+                    else
+                    {
                         chosenSpell = DetermineHighestSpellFromMP(PSpirit->m_healSingleSpells);
+                        ShowDebug("[TryIdleSpellCast] Single - chosenSpell (%s)", spell::GetSpell(static_cast<SpellID>(chosenSpell))->getName());
+                    }
 
                     // If the light spirit can't cast anything, then we return.
                     if (chosenSpell == 0)
@@ -359,7 +368,11 @@ bool CSpiritController::TryIdleSpellcast(time_point tick)
             if (castOnNearest)
                 spellIsCast = CastIdleSpell(static_cast<SpellID>(chosenSpell), qualifiedTargets.PNearest->targid);
             else
+            {
+                ShowDebug("Attempting to cast %s on %s", spell::GetSpell(static_cast<SpellID>(chosenSpell))->getName(), qualifiedTargets.PLowest->name);
                 spellIsCast = CastIdleSpell(static_cast<SpellID>(chosenSpell), qualifiedTargets.PLowest->targid);
+                ShowDebug("Cast %s", spellIsCast ? "succeeded!" : "failed!");
+            }
             // Update the timer based on all factors.
             setMagicCooldowns();
             return spellIsCast;
@@ -661,11 +674,10 @@ PMemberTargets CSpiritController::GetBestQualifiedMembers()
     TracyZoneScoped;
 
     PMemberTargets qualifiedTargets;
-    qualifiedTargets.PLowest     = nullptr;
-    qualifiedTargets.PNearest    = nullptr;
-    CBattleEntity* PLowest       = nullptr;
-    uint8          lowestPercent = 50;
-    float          closestPerson = 20.1f;
+    qualifiedTargets.PLowest  = nullptr;
+    qualifiedTargets.PNearest = nullptr;
+    uint8 lowestPercent       = 50;
+    float closestPerson       = 20.1f;
 
     // The SMN always takes priority over the rest of the alliance.
     if (PSpirit->PMaster->GetHPP() <= lowestPercent)
@@ -686,10 +698,9 @@ PMemberTargets CSpiritController::GetBestQualifiedMembers()
                 float curDist = distance(PSpirit->loc.p, PMember->loc.p);
 
                 // Check lowest HP
-                if (PLowest == nullptr ||
-                    (lowestPercent >= memberHPP))
+                if (lowestPercent >= memberHPP)
                 {
-                    PLowest = PMember;
+                    qualifiedTargets.PLowest = PMember;
                     lowestPercent = memberHPP;
                 }
 
@@ -784,7 +795,6 @@ uint16 CSpiritController::DetermineNextBuff(CBattleEntity& target)
 
 bool CSpiritController::CastIdleSpell(SpellID spellId, uint16 target)
 {
-    if (CanCastSpells())
-        return static_cast<CMobController>(PSpirit).Cast(target, spellId);
-    return false;
+    ShowDebug("[CastIdleSpell] (%s) (%u)", spell::GetSpell(spellId)->getName(), target);
+    return CanCastSpells() && PSpirit && Cast(target, spellId);
 }
